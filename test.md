@@ -37,8 +37,6 @@ print "test$COLOR_RESET\n\n";
     - i
         + j
         + j
-        + j
-    - i
 * item
 
   1. test
@@ -49,8 +47,7 @@ print "test$COLOR_RESET\n\n";
 
 this is italic *italic*
 this is bold   **bold**
-
-code is `a = 1;`
+this is code   `a = 1;`
 
 ## test link
 

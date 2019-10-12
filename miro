@@ -59,7 +59,7 @@ if (! -t STDOUT) {
 foreach $infile (@ARGV) {
     my $line, $text;
     my $indent = 1;
-    $CountIndent = -1;    # global
+    @CountIndent = ();      # global
 
     open(FILE, "<$infile") || die "Can't open to $infile";
     $line = <FILE>;
@@ -181,24 +181,24 @@ foreach $infile (@ARGV) {
                 print "$COLOR_RESET\n";
             }
 
-        } elsif ($line =~ /^(\s*)([\*\-\+]|[0-9]+\.)\s+(.*)$/) {   # item
+        } elsif ($line =~ /^(\s*)([\*\-\+]|[0-9]+\.)\s+(.*)$/) {   # list
             my $space = $1;
             my $mark = $2;
             $text = $3;
-            $indent += &indent_offset($space);
+            $indent = &indent_offset($space);
             &print_indent($indent);
             print "$COLOR_FG_LCYAN$mark$COLOR_RESET ";
             &print_context($text);
             print "\n";
         } elsif ($line =~ /^\s+$/) {                               # empty line
             $indent = 1;
-            $CountIndent = -1;
+            @CountIndent = ();
             print "\n";
         } else {                                                  # content
-            if ($CountIndent < 0) {
-                &print_indent($indent);
-            } else {
+            if (@CountIndent) {
                 &print_indent($indent + 1);
+            } else {
+                &print_indent($indent);
             }
             $line =~ s/^\s*//;
             &print_context($line);
@@ -232,7 +232,7 @@ sub print_indent {
     }
 }
 
-# use $CountIndent
+# use @CountIndent
 sub indent_offset {
     my ($space) = @_;
     my $count = 0, $ch, $ret;
@@ -246,17 +246,23 @@ sub indent_offset {
         }
     }
 
-    $ret = 0;
-    if ($CountIndent < 0) {
-        # not check
-    } elsif ($CountIndent > $count) {
-        $ret = -1;
-    } elsif ($CountIndent < $count) {
-        $ret = 1;
+    if (!@CountIndent) {
+        $CountIndent[0] = $count;
+        return 1;
     }
-    $CountIndent = $count;
+    $ret = $#CountIndent;
+    while ($ret >= 0) {
+        if ($CountIndent[$ret] < $count) {
+            $CountIndent[$ret + 1] = $count;
+            return $ret + 2;
+        } elsif ($CountIndent[$ret] == $count) {
+            return $ret + 1;
+        }
+        pop(@CountIndent);
+        $ret--;
+    }
 
-    return $ret;
+    return 1;
 }
 
 sub print_context {
