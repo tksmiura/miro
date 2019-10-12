@@ -1,0 +1,308 @@
+#!/usr/bin/perl
+# MIT License
+# Copyright (c) 2019 TAKESHI MIURA
+# https://github.com/tksmiura/color_log
+use utf8;
+use Data::Dumper;
+
+$COLOR_BG_BLACK   = "\x1b[40m";
+$COLOR_BG_RED     = "\x1b[41m";
+$COLOR_BG_GREEN   = "\x1b[42m";
+$COLOR_BG_YELLOW  = "\x1b[43m";
+$COLOR_BG_BLUE    = "\x1b[44m";
+$COLOR_BG_MAGENTA = "\x1b[45m";
+$COLOR_BG_CYAN    = "\x1b[46m";
+$COLOR_BG_WHITE   = "\x1b[47m";
+
+$COLOR_FG_BLACK   = "\x1b[30m";
+$COLOR_FG_RED     = "\x1b[31m";
+$COLOR_FG_GREEN   = "\x1b[32m";
+$COLOR_FG_YELLOW  = "\x1b[33m";
+$COLOR_FG_BLUE    = "\x1b[34m";
+$COLOR_FG_MAGENTA = "\x1b[35m";
+$COLOR_FG_CYAN    = "\x1b[36m";
+$COLOR_FG_WHITE   = "\x1b[37m";
+
+$COLOR_BG_LBLACK  = "\x1b[100m";
+$COLOR_BG_LRED    = "\x1b[101m";
+$COLOR_BG_LGREEN  = "\x1b[102m";
+$COLOR_BG_LYELLOW = "\x1b[103m";
+$COLOR_BG_LBLUE   = "\x1b[104m";
+$COLOR_BG_LMAGENTA= "\x1b[105m";
+$COLOR_BG_LCYAN   = "\x1b[106m";
+$COLOR_BG_LWHITE  = "\x1b[107m";
+
+$COLOR_FG_LBLACK  = "\x1b[90m";
+$COLOR_FG_LRED    = "\x1b[91m";
+$COLOR_FG_LGREEN  = "\x1b[92m";
+$COLOR_FG_LYELLOW = "\x1b[93m";
+$COLOR_FG_LBLUE   = "\x1b[94m";
+$COLOR_FG_LMAGENTA= "\x1b[95m";
+$COLOR_FG_LCYAN   = "\x1b[96m";
+$COLOR_FG_LWHITE  = "\x1b[97m";
+
+$COLOR_REVERSE    = "\x1b[7m";
+$COLOR_UNDERLINE  = "\x1b[4m";
+$COLOR_BOLD       = "\x1b[1m";
+$COLOR_RESET      = "\x1b[0m";
+
+# terminal size
+$TERM_WIDTH       = `tput cols`;
+$TERM_HEIGHT      = `tput lines`;
+
+# test tty
+if (! -t STDOUT) {
+    printf "not terminal\n";
+    exit;
+}
+
+foreach $infile (@ARGV) {
+    my $line, $text;
+    my $indent = 1;
+    $CountIndent = -1;    # global
+
+    open(FILE, "<$infile") || die "Can't open to $infile";
+    $line = <FILE>;
+    $line_next = <FILE>;     # one line read ahead
+    while ($line) {
+
+        if ($line =~ /^\s*(#+)\s*([^\s].*)$/) {           # Header
+            my ($l) = length($1);
+            $text = $2;
+            &print_header($l, $text);
+        } elsif ($line_next =~/\s*\=+\s*$/) {             # Header
+            chop $line;
+            &print_header(1, $line);
+            $line_next = <FILE>;
+        } elsif ($line_next =~/\s*\-\-\-\-+\s*$/) {       # Header
+            chop $line;
+            &print_header(2, $line);
+            $line_next = <FILE>;
+        } elsif ($line =~ /^```/) {                      # code
+            $line = $line_next;
+            $line_next = <FILE>;
+            while ($line !~ /^```/) {
+                $text = $line;
+                chop $text;
+                $text .= " " x ($TERM_WIDTH - length($text) - 8);
+                &print_indent($indent);
+                &bgrey_printf(12);
+                print "$text$COLOR_RESET\n";
+
+                $line = $line_next;
+                $line_next = <FILE>;
+            }
+        } elsif ($line =~ /^---/) {                      # bar
+                $text = " " x ($TERM_WIDTH);
+                print "${COLOR_UNDERLINE}$text$COLOR_RESET\n";
+        } elsif ($line =~ /^\s*((>\s*)+)(.*)$/) {        # quate
+            my $l = 0;
+            my $ls = $1;
+            $text = $3;
+            $ls =~ s/\s//g;
+            $l = length($ls);
+            &print_indent($indent);
+            for ($i = 0; $i < $l; $i ++) {
+                &bgrey_printf(12);
+                print " ";
+                print "${COLOR_RESET}  ";
+            }
+            print "$text\n";
+        } elsif ($line =~ /^\s*\!\[([^\]]+)\]\s*\(([^\)]+)\)/) {  # image link
+            my $name = $1;
+            my $link = $2;
+            &print_indent($indent);
+            print "[$COLOR_FG_GREEN$name$COLOR_RESET]\n";
+        } elsif ($line =~ /^\s*\|/) {                            # table
+            my @table, @l, @witdh, @lr;
+            my $c = 0, $max_column = 0;
+            my $head = -1;
+
+            while (1) {
+                $line =~ s/^\s*\|\s*//;
+                $line =~ s/\s*\|\s*$//;
+                if ($head < 0 && $line =~ /---/) {
+                    my @l;
+                    $head = $c - 1;
+                    @l = split(/\s*\|\s*/, $line);
+                    for ($i = 0; $i <= $#l; $i ++) {
+                        if ($l[$i] =~ /^\:.*\:$/) {
+                            $lr[$i] = 0;
+                        } elsif ($l[$i] =~ /\:$/) {
+                            $lr[$i] = 1;
+                        } else {
+                            $lr[$i] = -1;
+                        }
+                    }
+                } else {
+                    my @l;
+                    @l = split(/\s*\|\s*/, $line);
+                    $table[$c] = \@l;
+                    if ($max_column < $#l + 1) {
+                        $max_column = $#l + 1;
+                    }
+                    for ($i = 0; $i <= $#l; $i ++) {
+                        if ($width[$i] < length($l[$i])) {
+                            $width[$i] = length($l[$i]);
+                        }
+                    }
+                    $c++;
+                }
+                if ($line_next !~ /^\s*\|/) {
+                    last;                        # loop exit
+                }
+                $line = $line_next;
+                $line_next = <FILE>;
+            };
+            # print table
+            my $x, $y;
+            for ($y = 0; $y < $c; $y++) {
+                &print_indent($indent);
+                for ($x = 0; $x < $max_column; $x++) {
+                    my $pad_l, $pad_r;
+                    if ($lr[$x] == -1) {
+                        $pad_l = " " x ($width[$x] - length($table[$y][$x]));
+                        $pad_r = "";
+                    } elsif ($lr[$x] == 1) {
+                        $pad_l = "";
+                        $pad_r = " " x ($width[$x] - length($table[$y][$x]));
+                    } else {
+                        $pad_l = " " x (($width[$x] - length($table[$y][$x])) / 2);
+                        $pad_r = " " x ($width[$x] - length($table[$y][$x]) - length($pad_l));
+                    }
+                    if ($y <= $head) {
+                        printf("$COLOR_REVERSE$COLOR_BOLD");
+                        &grey_printf(($x % 2)*4 + 15);
+                    } else {
+                        &bcolor256_printf(0, $y % 2 + 1, ($x % 2)*2 + 2);
+                    }
+                    print " $pad_l$table[$y][$x]$pad_r";
+                }
+                print "$COLOR_RESET\n";
+            }
+
+        } elsif ($line =~ /^(\s*)([\*\-\+]|[0-9]+\.)\s+(.*)$/) {   # item
+            my $space = $1;
+            my $mark = $2;
+            $text = $3;
+            $indent += &indent_offset($space);
+            &print_indent($indent);
+            print "$COLOR_FG_LCYAN$mark$COLOR_RESET ";
+            &print_context($text);
+            print "\n";
+        } elsif ($line =~ /^\s+$/) {                               # empty line
+            $indent = 1;
+            $CountIndent = -1;
+            print "\n";
+        } else {                                                  # content
+            if ($CountIndent < 0) {
+                &print_indent($indent);
+            } else {
+                &print_indent($indent + 1);
+            }
+            $line =~ s/^\s*//;
+            &print_context($line);
+        }
+        $line = $line_next;
+        $line_next = <FILE>;
+    }
+}
+
+exit 0;
+
+sub print_header {
+    my ($l, $text) = @_;
+
+    if ($l == 1) {
+        $text .= " " x ($TERM_WIDTH - length($text));
+        print "${COLOR_BG_YELLOW}$text$COLOR_RESET\n";
+    } elsif ($l == 2) {
+        $text .= " " x ($TERM_WIDTH - length($text));
+        print "${COLOR_UNDERLINE}${COLOR_BOLD}${COLOR_FG_LYELLOW}";
+        print "$text$COLOR_RESET\n";
+    } else {
+        print "${COLOR_BOLD}${COLOR_FG_LYELLOW}$text$COLOR_RESET\n";
+    }
+}
+
+sub print_indent {
+    my ($indent) = @_;
+    if ($indent > 0) {
+        print ("    " x $indent);
+    }
+}
+
+# use $CountIndent
+sub indent_offset {
+    my ($space) = @_;
+    my $count = 0, $ch, $ret;
+
+    foreach $ch (split //, $space) {
+        if ($ch eq " ") {
+            $count += 1;
+        } elsif ($ch eq "\t") {
+            $count += 1;
+            $count = ($count / 8) * 8 + 8;
+        }
+    }
+
+    $ret = 0;
+    if ($CountIndent < 0) {
+        # not check
+    } elsif ($CountIndent > $count) {
+        $ret = -1;
+    } elsif ($CountIndent < $count) {
+        $ret = 1;
+    }
+    $CountIndent = $count;
+
+    return $ret;
+}
+
+sub print_context {
+    my ($text) = @_;
+
+    # *text* **text**
+    $text =~ s/\*\*([^\*]+)\*\*/${COLOR_BOLD}$1$COLOR_RESET/g;
+    $text =~ s/\*([^\*]+)\*/${COLOR_FG_RED}$1$COLOR_RESET/g;
+
+    # URL
+    $text =~ s/\[([^\]]+)\]\s*\([^\]]*\)/$COLOR_FG_CYAN$COLOR_UNDERLINE$1$COLOR_RESET/;
+    $text =~ s/((http|https|ftp|file)\:[^\s]+)/$COLOR_FG_CYAN$COLOR_UNDERLINE$1$COLOR_RESET/g;
+
+    # code
+    $text =~ s/`([^`]+)`/${COLOR_BG_LBLACK}$1$COLOR_RESET/g;
+
+    # <br>
+    $text =~ s/<[bB][rR]>//g;
+
+    print $text;
+}
+
+# 256 color r,g,b [0-5]
+sub bcolor256_printf {
+    my ($r, $g, $b) = @_;
+    my $c = 16 + 36 * $r+ 6 * $g + $b;
+    printf("\033[38;5;${c}m");
+}
+
+# 256 color r,g,b [0-5] backgound
+sub bcolor256_printf {
+    my ($r, $g, $b) = @_;
+    my $c = 16 + 36 * $r+ 6 * $g + $b;
+    printf("\033[48;5;${c}m");
+}
+
+# 256 color gley scale [0-23]
+sub grey_printf {
+    my ($l) = @_;
+    my $c = 232 + $l;
+    printf("\033[38;5;${c}m");
+}
+
+# 256 color gley scale [0-23] background
+sub bgrey_printf {
+    my ($l) = @_;
+    my $c = 232 + $l;
+    printf("\033[48;5;${c}m");
+}
