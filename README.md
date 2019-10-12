@@ -14,5 +14,5 @@ $ miro <markdown file>
 
 ## samples
 
-![test1](https://github.com/tksmiura/miro/blob/master/test/test_screenshto1.png)
-![test2](https://github.com/tksmiura/miro/blob/master/test/test_screenshto2.png)
+![test1](https://github.com/tksmiura/miro/blob/master/test/test_screenshot1.png)
+![test2](https://github.com/tksmiura/miro/blob/master/test/test_screenshot2.png)
