@@ -1,9 +1,11 @@
 #!/usr/bin/perl
 # MIT License
 # Copyright (c) 2019 TAKESHI MIURA
-# https://github.com/tksmiura/color_log
+# https://github.com/tksmiura/miro
 use utf8;
 use Data::Dumper;
+
+$TAB_WITDH        = 8;
 
 $COLOR_BG_BLACK   = "\x1b[40m";
 $COLOR_BG_RED     = "\x1b[41m";
@@ -53,7 +55,7 @@ $TERM_HEIGHT      = `tput lines`;
 # test tty
 if (! -t STDOUT) {
     printf "not terminal\n";
-    exit;
+    exit 1;
 }
 
 foreach $infile (@ARGV) {
@@ -78,13 +80,14 @@ foreach $infile (@ARGV) {
             chop $line;
             &print_header(2, $line);
             $line_next = <FILE>;
-        } elsif ($line =~ /^```/) {                      # code
+        } elsif ($line =~ /^```/) {                       # code
             $line = $line_next;
             $line_next = <FILE>;
             while ($line !~ /^```/) {
-                $text = $line;
+                $text = &change_tab($line);
                 chop $text;
                 $text .= " " x ($TERM_WIDTH - length($text) - 8);
+
                 &print_indent($indent);
                 &bgrey_printf(12);
                 print "$text$COLOR_RESET\n";
@@ -190,7 +193,26 @@ foreach $infile (@ARGV) {
             print "$COLOR_FG_LCYAN$mark$COLOR_RESET ";
             &print_context($text);
             print "\n";
-        } elsif ($line =~ /^\s+$/) {                               # empty line
+        } elsif ($line =~ /^    / || $line =~ /^\t/) {           # code 2
+            $text = &change_tab($line);
+            $text =~ /^( +)/;
+            my $code_indent = length($1);
+            while (1) {
+                chop $text;
+                $text = substr($text, $code_indent);
+                $text .= " " x ($TERM_WIDTH - length($text) - 8);
+                &print_indent($indent);
+                &bgrey_printf(12);
+                print "$text$COLOR_RESET\n";
+
+                if ($line_next !~ /^    / && $line_next !~ /^\t/) {
+                    last;
+                }
+                $line = $line_next;
+                $line_next = <FILE>;
+                $text = &change_tab($line);
+            }
+        } elsif ($line =~ /^\s+$/) {                              # empty line
             $indent = 1;
             @CountIndent = ();
             print "\n";
@@ -232,6 +254,22 @@ sub print_indent {
     }
 }
 
+sub change_tab {
+    my ($text) = @_;
+    my $count = 0, $pad, $ret = "";
+
+    foreach $ch (split //, $text) {
+        if ($ch eq "\t") {
+            $pad = $TAB_WITDH - ($count % $TAB_WITDH);
+            $ret .= " " x $pad;
+        } else {
+            $count++;
+            $ret .= $ch;
+        }
+    }
+    return $ret;
+}
+
 # use @CountIndent
 sub indent_offset {
     my ($space) = @_;
@@ -242,7 +280,7 @@ sub indent_offset {
             $count += 1;
         } elsif ($ch eq "\t") {
             $count += 1;
-            $count = ($count / 8) * 8 + 8;
+            $count = ($count / $TAB_WITDH) * $TAB_WITDH + $TAB_WITDH;
         }
     }
 

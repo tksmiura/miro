@@ -1,4 +1,4 @@
-# test miro.pl
+# test miro
 
 ## test headers
 
@@ -12,10 +12,18 @@
 
 ## test code
 
+backquate
+
 ```
 &bcolor256_printf(1, 1, 2);
 print "test$COLOR_RESET\n\n";
 ```
+
+space indent
+
+    if (b) {
+	test();
+    }
 
 ## test bar
 
@@ -45,9 +53,9 @@ print "test$COLOR_RESET\n\n";
 
 ## test bold/italic/code(inline)
 
-this is italic *italic*
-this is bold   **bold**
-this is code   `a = 1;`
+this is italic *italic*.
+this is bold   **bold**.
+this is code   `a = 1;`.
 
 ## test link
 
