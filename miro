@@ -411,7 +411,7 @@ sub print_context {
     $text =~ s/\*([^\*]+)\*/${COLOR_FG_RED}$1$COLOR_RESET/g;
 
     # code
-    $text =~ s/`([^`]+)`/${COLOR_BG_LBLACK}$1$COLOR_RESET/g;
+    $text =~ s/`(`*[^`]+`*)`/${COLOR_BG_LBLACK}$1$COLOR_RESET/g;
 
     # <br>
     $text =~ s/<[bB][rR]>//g;
@@ -433,7 +433,7 @@ sub inner_context {
     $text =~ s/\*([^\*]+)\*/$1/g;
 
     # code
-    $text =~ s/`([^`]+)`/$1/g;
+    $text =~ s/`(`*[^`]+`*)`/$1/g;
 
     # <br>
     $text =~ s/<[bB][rR]>//g;
