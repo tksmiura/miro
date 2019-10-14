@@ -399,16 +399,16 @@ sub print_code {
 sub print_context {
     my ($text) = @_;
 
+    # image link
+    $text =~ s/\!\[(.*)\]\(([^\)]+)\)/[$COLOR_FG_GREEN$1$COLOR_RESET]/g;
+
+    # URL
+    $text =~ s/\[(.*)\]\([^\]]*\)/$COLOR_FG_CYAN$COLOR_UNDERLINE$1$COLOR_RESET/g;
+    $text =~ s/((http|https|ftp|file)\:[^\s]+)/$COLOR_FG_CYAN$COLOR_UNDERLINE$1$COLOR_RESET/g;
+
     # *text* **text**
     $text =~ s/\*\*([^\*]+)\*\*/${COLOR_BOLD}$1$COLOR_RESET/g;
     $text =~ s/\*([^\*]+)\*/${COLOR_FG_RED}$1$COLOR_RESET/g;
-
-    # image link
-    $text =~ s/\!\[([^\]]+)\]\s*\(([^\)]+)\)/[$COLOR_FG_GREEN$1$COLOR_RESET]/;
-
-    # URL
-    $text =~ s/\[([^\]]+)\]\s*\([^\]]*\)/$COLOR_FG_CYAN$COLOR_UNDERLINE$1$COLOR_RESET/;
-    $text =~ s/((http|https|ftp|file)\:[^\s]+)/$COLOR_FG_CYAN$COLOR_UNDERLINE$1$COLOR_RESET/g;
 
     # code
     $text =~ s/`([^`]+)`/${COLOR_BG_LBLACK}$1$COLOR_RESET/g;
@@ -422,16 +422,15 @@ sub print_context {
 sub inner_context {
     my ($text) = @_;
 
+    # image link
+    $text =~ s/\!\[(.*)\]\(([^\)]+)\)/[$1]/g;
+
+    # URL
+    $text =~ s/\[(.*)\]\([^\]]*\)/$1/g;
+
     # *text* **text**
     $text =~ s/\*\*([^\*]+)\*\*/$1/g;
     $text =~ s/\*([^\*]+)\*/$1/g;
-
-    # image link
-    $text =~ s/\!\[([^\]]+)\]\s*\(([^\)]+)\)/[$1]/;
-
-    # URL
-    $text =~ s/\[([^\]]+)\]\s*\([^\]]*\)/$1/;
-#    $text =~ s/((http|https|ftp|file)\:[^\s]+)/$COLOR_FG_CYAN$COLOR_UNDERLINE$1$COLOR_RESET/g;
 
     # code
     $text =~ s/`([^`]+)`/$1/g;
