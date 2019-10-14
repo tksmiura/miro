@@ -98,19 +98,20 @@ foreach $infile (@ARGV) {
             &print_header($l, $text);
             $indent = 1;
             @CountIndent = ();
-        } elsif ($line_next =~/^\s*\=+\s*$/) {                  # Header
+        } elsif ($line_next =~/^\s*\=+\s*$/) {                 # Header
             chop $line;
             &print_header(1, $line);
             $line_next = <FILE>;
             $indent = 1;
             @CountIndent = ();
-        } elsif ($line_next =~/^\s*----+\s*$/) { # Header
+        } elsif ($line_next =~/^\s*----+\s*$/) {               # Header
             chop $line;
             &print_header(2, $line);
             $line_next = <FILE>;
             $indent = 1;
             @CountIndent = ();
-        } elsif ($line =~ /^\s*(````*)/) {                      # code `
+        } elsif ($line !~ /^\s*````*[^`]+`/ &&
+                 $line =~ /^\s*(````*)/) {                     # code `
             my $quote_len = length($1);
             $line = $line_next;
             $line_next = <FILE>;
@@ -144,10 +145,10 @@ foreach $infile (@ARGV) {
                 $line = $line_next;
                 $line_next = <FILE>;
             }
-        } elsif ($line =~ /^\s*---/ && $line !~ /[^\|]/) {   # bar
+        } elsif ($line =~ /^\s*---/ && $line !~ /[^\|]/) {     # bar
                 $text = " " x ($TERM_WIDTH);
                 print "${COLOR_UNDERLINE}$text$COLOR_RESET\n";
-        } elsif ($line =~ /^\s*((>\s*)+)(.*)$/) {        # quate
+        } elsif ($line =~ /^\s*((>\s*)+)(.*)$/) {              # quate
             my $l = 0;
             my $ls = $1;
             $text = $3;
@@ -165,7 +166,7 @@ foreach $infile (@ARGV) {
             my $link = $2;
             &print_indent($indent);
             print "[$COLOR_FG_GREEN$name$COLOR_RESET]\n";
-        } elsif ($line =~ /\|/) {                            # table
+        } elsif ($line =~ /\|/) {                                 # table
             my @table, @l, @witdh, @lr;
             my $c = 0, $max_column = 0;
             my $head = -1;
@@ -243,8 +244,6 @@ foreach $infile (@ARGV) {
             &print_context($text);
             print "\n";
         } elsif ($line =~ /^\s+$/) {                              # empty line
-#            $indent = 1;
-#            @CountIndent = ();
             print "\n";
         } else {                                                  # content
             $line =~ s/^(\s*)//;
