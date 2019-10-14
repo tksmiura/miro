@@ -92,24 +92,6 @@ foreach $infile (@ARGV) {
             }
             &print_code($content, $indent, $code_indent);
             next;
-        } elsif ($line =~ /^\s*(#+)\s*([^\s].*)$/) {           # Header
-            my ($l) = length($1);
-            $text = $2;
-            &print_header($l, $text);
-            $indent = 1;
-            @CountIndent = ();
-        } elsif ($line_next =~/^\s*\=+\s*$/) {                 # Header
-            chop $line;
-            &print_header(1, $line);
-            $line_next = <FILE>;
-            $indent = 1;
-            @CountIndent = ();
-        } elsif ($line_next =~/^\s*----+\s*$/) {               # Header
-            chop $line;
-            &print_header(2, $line);
-            $line_next = <FILE>;
-            $indent = 1;
-            @CountIndent = ();
         } elsif ($line !~ /^\s*````*[^`]+`/ &&
                  $line =~ /^\s*(````*)/) {                     # code `
             my $quote_len = length($1);
@@ -145,7 +127,7 @@ foreach $infile (@ARGV) {
                 $line = $line_next;
                 $line_next = <FILE>;
             }
-        } elsif ($line =~ /^\s*---/ && $line !~ /[^\|]/) {     # bar
+        } elsif ($line =~ /^\s*---/ && $line !~ /\|/) {     # bar
                 $text = " " x ($TERM_WIDTH);
                 print "${COLOR_UNDERLINE}$text$COLOR_RESET\n";
         } elsif ($line =~ /^\s*((>\s*)+)(.*)$/) {              # quate
@@ -245,6 +227,24 @@ foreach $infile (@ARGV) {
             print "\n";
         } elsif ($line =~ /^\s+$/) {                              # empty line
             print "\n";
+        } elsif ($line =~ /^\s*(#+)\s*([^\s].*)$/) {              # Header
+            my ($l) = length($1);
+            $text = $2;
+            &print_header($l, $text);
+            $indent = 1;
+            @CountIndent = ();
+        } elsif ($line_next =~/^\s*\=+\s*$/) {                    # Header
+            chop $line;
+            &print_header(1, $line);
+            $line_next = <FILE>;
+            $indent = 1;
+            @CountIndent = ();
+        } elsif ($line_next =~/^\s*----+\s*$/) {                  # Header
+            chop $line;
+            &print_header(2, $line);
+            $line_next = <FILE>;
+            $indent = 1;
+            @CountIndent = ();
         } else {                                                  # content
             $line =~ s/^(\s*)//;
             $indent = &indent_offset($1, 0);
