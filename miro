@@ -101,7 +101,7 @@ foreach $infile (@ARGV) {
             my $space_len = length(&change_tab($1));
             my $quote_len = length($2);
             $indent = &indent_offset($1, 0);
-            &buffer_flash();
+            &buffer_flush();
             $line = $line_next;
             $line_next = <FILE>;
             while ($line &&
@@ -127,7 +127,7 @@ foreach $infile (@ARGV) {
             my $space_len = length(&change_tab($1));
             my $quote_len = length($2);
             $indent = &indent_offset($1, 0);
-            &buffer_flash();
+            &buffer_flush();
             $line = $line_next;
             $line_next = <FILE>;
             while ($line &&
@@ -151,7 +151,7 @@ foreach $infile (@ARGV) {
         } elsif ($line =~ /^\s*---/ && $line !~ /\|/) {     # bar
             $line =~ s/^(\s*)//;
             $indent = &indent_offset($1, 0);
-            &buffer_flash();
+            &buffer_flush();
             $text = " " x ($TERM_WIDTH - $indent * 4);
             &print_indent($indent);
             print "${COLOR_UNDERLINE}$text$COLOR_RESET\n";
@@ -160,7 +160,7 @@ foreach $infile (@ARGV) {
             my $ls = $2;
             $text = $4;
             $indent = &indent_offset($1, 0);
-            &buffer_flash();
+            &buffer_flush();
             $ls =~ s/\s//g;
             $l = length($ls);
             &print_indent($indent);
@@ -175,7 +175,7 @@ foreach $infile (@ARGV) {
             my $c = 0, $max_column = 0;
             my $head = -1;
 
-            &buffer_flash();
+            &buffer_flush();
             $line =~ s/^(\s*)//;
             $indent = &indent_offset($1, 0);
 
@@ -249,13 +249,13 @@ foreach $infile (@ARGV) {
             $space = $1;
             my $mark = $2;
             $text = $3;
-            &buffer_flash();
+            &buffer_flush();
             $indent = &indent_offset($space, 1);
             &print_indent($indent);
             print "$COLOR_FG_LCYAN$mark$COLOR_RESET ";
             &buffer_context($indent + 1, "$text\n", 1);
         } elsif ($line =~ /^\s+$/) {                              # empty line
-            &buffer_flash();
+            &buffer_flush();
             print "\n";
         } elsif ($line =~ /^(\s*)(#+)\s*([^\s].*)$/) {              # Header
             $indent = &indent_offset($1, 0);
@@ -293,7 +293,7 @@ foreach $infile (@ARGV) {
         $line = $line_next;
         $line_next = <FILE>;
     }
-    &buffer_flash();
+    &buffer_flush();
 }
 
 exit 0;
@@ -301,7 +301,7 @@ exit 0;
 sub print_header {
     my ($l, $indent, $text) = @_;
 
-    &buffer_flash();
+    &buffer_flush();
     $text = &inner_context($text);
 
     if ($indent > 0) {
@@ -411,7 +411,7 @@ sub buffer_context {
     my ($indent, $text, $f_list) = @_;
 
     if ($f_list) {
-        &buffer_flash();
+        &buffer_flush();
         $Flist = 1;
     }
 
@@ -421,7 +421,7 @@ sub buffer_context {
     $Buffer .= $text;
 }
 
-sub buffer_flash {
+sub buffer_flush {
     my ($text) = $Buffer;
 
     if (length($text) == 0) {
@@ -445,14 +445,29 @@ sub buffer_flash {
     # <br>
     $text =~ s/<[bB][rR]>//g;
 
+    my $pre_seq = "";
+    my $post_seq = "";
+    my $next_seq = "";
     foreach $line (split /\n/, $text) {
+        $pre_seq = $next_seq;
+        if ($line =~ /(\x1b\[[^m]+m).*$/) {
+            $next_seq = $1;
+            if ($next_seq eq $COLOR_RESET) {
+                $next_seq = "";
+                $post_seq = "";
+            } else {
+                $post_seq = "$COLOR_RESET";
+            }
+        } elsif (length($next_seq) > 0) {
+            $post_seq = "$COLOR_RESET";
+        }
+
         if ($Flist) {
             $Flist = 0;
-            print "$line\n";
         } else {
             &print_indent($BufferIndent);
-            print "$line\n";
         }
+        print "$pre_seq$line$post_seq\n";
     }
     $Buffer = "";
 }
