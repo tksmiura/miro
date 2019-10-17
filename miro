@@ -69,7 +69,7 @@ foreach $infile (@ARGV) {
     }
 
     $Buffer = "";
-    @dest = &parse_markdown($TERM_WIDTH, \@lines);
+    @dest = &parse_markdown($TERM_WIDTH - 4, 4, \@lines);
     foreach $l (@dest) {
         print "$l\n";
     }
@@ -78,12 +78,13 @@ foreach $infile (@ARGV) {
 exit 0;
 
 sub parse_markdown {
-    my ($width, $lines) = @_;
+    my ($width, $pad, $lines) = @_;
     my @line = @$lines;
     my @dest, @sub_line;
     my $buffer = "";
     my $i;
     my $f_cont = 0;
+    my $pad_s = " " x $pad;
 
     @dest = ();
     for ($i = 0; $i <= $#line; $i++) {
@@ -93,7 +94,7 @@ sub parse_markdown {
         if (!$f_cont && ($l =~ /^    / || $l =~ /^\t/)) {    # code (indent)
             my $code_indent = 10000;
             my $cnt_brank = 0;
-            $Buffer && push @dest, &buffer_flush();
+            $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             @sub_line = ();
             while ($i <= $#line &&
                    ($l =~ /^    / || $l =~ /^\t/ || $l =~ /^\s*$/)) {
@@ -114,7 +115,8 @@ sub parse_markdown {
                 $l = $line[++$i];
             }
             $i--;
-            push @dest, &output_code(\@sub_line, $code_indent, $width);
+            push @dest, &add_pad($pad, &output_code(\@sub_line,
+                                                    $code_indent, $width));
             while ($cnt_brank > 0) {
                 push @dest, "";
                 $cnt_brank--;
@@ -123,7 +125,7 @@ sub parse_markdown {
                  $l =~ /^(\s*)(````*)/) {                     # code `
             my $space_len = length(&change_tab($1));
             my $quote_len = length($2);
-            $Buffer && push @dest, &buffer_flush();
+            $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             @sub_line = ();
             while (++$i <= $#line && ($line[$i] !~ /^\s*(````*)\s*$/ ||
                                        length($1) < $quote_len)) {
@@ -135,12 +137,12 @@ sub parse_markdown {
                 }
                 push @sub_line, $text;
             }
-            push @dest, &output_code(\@sub_line, 0, $width);
+            push @dest, &add_pad($pad, &output_code(\@sub_line, 0, $width));
         } elsif ($l !~ /^\s*~~~~*[^~]+~/ &&
                  $l =~ /^(\s*)(~~~~*)/) {                     # code ~
             my $space_len = length(&change_tab($1));
             my $quote_len = length($2);
-            $Buffer && push @dest, &buffer_flush();
+            $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             @sub_line = ();
             while (++$i <= $#line && ($line[$i] !~ /^\s*(~~~~*)\s*$/ ||
                                        length($1) < $quote_len)) {
@@ -152,10 +154,10 @@ sub parse_markdown {
                 }
                 push @sub_line, $text;
             }
-            push @dest, &output_code(\@sub_line, 0, $width);
+            push @dest, &add_pad($pad, &output_code(\@sub_line, 0, $width));
         } elsif ($l =~ /^\s*>(.*$)/) {              # quote
             my $t = $1;
-            $Buffer && push @dest, &buffer_flush();
+            $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             @sub_line = ();
             while ($i <= $#line) {
                 push @sub_line, $t;
@@ -166,17 +168,17 @@ sub parse_markdown {
                 $t = $1;
             }
             $i--;
-            @sub_line = &parse_markdown($width - 3, \@sub_line);
+            @sub_line = &parse_markdown($width - 3, 0, \@sub_line);
             foreach $l (@sub_line) {
                 my $color = &get_bgrey(12);
-                push @dest, "$color $COLOR_RESET  $l";
+                push @dest, "$pad_s$color $COLOR_RESET  $l";
             }
 
         } elsif ($l =~ /^(\s*)([\*\-\+]|[0-9]+\.)\s(.*)$/) {   # list
             my $mark = $2;
             my $text = $3;
             my $indent = length($1) + length($2) + 1;
-            $Buffer && push @dest, &buffer_flush();
+            $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             @sub_line = ();
             push @sub_line, $text;
             $f_cont = 1;
@@ -211,15 +213,15 @@ sub parse_markdown {
                 $indent = 4;
                 $space = " " x ($indent - length($mark) - 1);
             }
-            @sub_line = &parse_markdown($width - $indent, \@sub_line);
+            @sub_line = &parse_markdown($width - $indent, 0, \@sub_line);
             $l = shift(@sub_line);
-            push @dest, "$space$COLOR_FG_LCYAN$mark$COLOR_RESET $l";
+            push @dest, "$pad_s$space$COLOR_FG_LCYAN$mark$COLOR_RESET $l";
             $space = " " x $indent;
             foreach $l (@sub_line) {
-                push @dest, "$space$l";
+                push @dest, "$pad_s$space$l";
             }
         } elsif ($l =~ /^\s*---/ && $l !~ /\|/) {     # bar
-            $Buffer && push @dest, &buffer_flush();
+            $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             my $t = " " x $width;
             push @dest, "${COLOR_UNDERLINE}$t$COLOR_RESET\n";
         } elsif ($l =~ /\|/) {                                 # table
@@ -227,7 +229,7 @@ sub parse_markdown {
             my $c = 0, $max_column = 0;
             my $head = -1;
 
-            $Buffer && push @dest, &buffer_flush();
+            $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             do {
                 $l =~ s/^\s*//;
                 $l =~ s/^\|\s*//;
@@ -293,38 +295,50 @@ sub parse_markdown {
                     }
                     $str .= "$color$pad_l $table[$y][$x]$pad_r";
                 }
-                push @dest,  "$str$COLOR_RESET";
+                push @dest,  "$pad_s$str$COLOR_RESET";
             }
         } elsif ($l =~ /^\s*$/) {                              # empty line
-            $Buffer && push @dest, &buffer_flush();
+            $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             push @dest, "";
             $f_cont = 0;
         } elsif ($l =~ /^\s*(#+)\s+([^\s].*)$/) {              # Header  #+
             my $level = length($1);
             my $t = $2;
-            $Buffer && push @dest, &buffer_flush();
+            $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             push @dest, &output_header($level, $width, $t);
-        } elsif ($line[$i+1] =~/^\s*\=+\s*$/) {                    # Header ==
+        } elsif ($line[$i+1] =~/^\s*\=+\s*$/) {                # Header ==
             $l =~ /^(\s*)([^\s].*)$/;
-            $Buffer && push @dest, &buffer_flush();
+            $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             push @dest, &output_header(1, $width, $l);
             $i++;
-        } elsif ($line[$i+1] =~/^\s*-+\s*$/) {                     # Header --
+        } elsif ($line[$i+1] =~/^\s*-+\s*$/) {                 # Header --
             $l =~ /^(\s*)([^\s].*)$/;
-            $Buffer && push @dest, &buffer_flush();
+            $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             push @dest, &output_header(2, $width, $l);
             $i++;
-        } else {                                                  # content
+        } else {                                               # content
             $l =~ s/^(\s*)//;
             &buffer_context($l);
             $f_cont = 1;
         }
     }
-    $Buffer && push @dest, &buffer_flush();
+    $Buffer && push @dest, &add_pad($pad, &buffer_flush());
 
     return @dest;
 }
 
+
+sub add_pad {
+    my $pad = shift @_;
+    my  @dest = @_;
+    my $i, $pad_s = " " x $pad;
+    if (@dest) {
+        for ($i = 0; $i <= $#dest; $i++) {
+            $dest[$i] = $pad_s . $dest[$i];
+        }
+    }
+    return @dest;
+}
 
 sub output_header {
     my ($l, $width, $text) = @_;
