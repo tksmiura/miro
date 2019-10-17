@@ -1,13 +1,13 @@
 # list
 
-     - test(code)
+    - test(code)
 
 ## list nest
 
    - test(list)
-       * test(list)
+       * test(list2)
    - test(list)
-    * test(list)
+     * test(list2)
 
 
 ## list with black line
@@ -21,7 +21,7 @@
 
    - test
 
-ssss
+    ssss
 
        * test(code)
 
@@ -29,24 +29,24 @@ ssss
 
    - test
 
-    ssss(in list)
+     ssss(in list)
 
        * test(list)
 
    - test
 
-   ssss(not in list)
+    ssss(code)
 
        * test(code)
 
    - test list
        * test(list2)
 
-    ssss(in list)
+     ssss(in list)
 
      * test(list2)
 
-#code
+# code
 
    ```
    code
