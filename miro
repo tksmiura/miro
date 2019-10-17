@@ -59,264 +59,287 @@ if (! -t STDOUT) {
 }
 
 foreach $infile (@ARGV) {
-    my $line, $text;
-    my $indent = 1;
-    my $content;
-    my $space;
-
-    @CountIndent = ();      # global
-    $Buffer = "";
-    $BufferIndent = 1;
-    $Flist = 0;
-
     open(FILE, "<$infile") || die "Can't open to $infile";
+    my @lines = <FILE>;
+    my @dest;
+    my $i;
 
-    $line = <FILE>;
-    $line_next = <FILE>;                         # one line read ahead
-    while ($line) {
+    for ($i = 0; $i <= $#lines; $i++) {
+        chop $lines[$i];
+    }
 
-        if (!@CountIndent && length($Buffer) == 0 &&
-            ($line =~ /^    / || $line =~ /^\t/)) {         # code (indent)
+    $Buffer = "";
+    @dest = &parse_markdown($TERM_WIDTH, \@lines);
+    foreach $l (@dest) {
+        print "$l\n";
+    }
+}
+
+exit 0;
+
+sub parse_markdown {
+    my ($width, $lines) = @_;
+    my @line = @$lines;
+    my @dest, @sub_line;
+    my $buffer = "";
+    my $i;
+    my $f_cont = 0;
+
+    @dest = ();
+    for ($i = 0; $i <= $#line; $i++) {
+        my $l = $line[$i];
+        my $text;
+
+        if (!$f_cont && ($l =~ /^    / || $l =~ /^\t/)) {    # code (indent)
             my $code_indent = 10000;
-            $content = "";
-            while ($line =~ /^    / || $line =~ /^\t/
-                   || $line =~ /^\s+$/) {
-                if ($line !~ /^\s+$/) {
-                    $text = &change_tab($line);
+            my $cnt_brank = 0;
+            $Buffer && push @dest, &buffer_flush();
+            @sub_line = ();
+            while ($i <= $#line &&
+                   ($l =~ /^    / || $l =~ /^\t/ || $l =~ /^\s*$/)) {
+                if ($l !~ /^\s*$/) {
+                    $text = &change_tab($l);
                     $text =~ /^( +)/;
                     if ($code_indent > length($1)) {
                         $code_indent = length($1);
                     }
-                    $content .= $text;
+                    while ($cnt_brank > 0) {
+                        push @sub_line, "";
+                        $cnt_brank--;
+                    }
+                    push @sub_line, $text;
                 } else {
-                    $content .= "\n";
+                    $cnt_brank++;
                 }
-                $line = $line_next;
-                $line_next = <FILE>;
+                $l = $line[++$i];
             }
-            &print_code($content, 1, $code_indent);
-            next;
-        } elsif ($line !~ /^\s*````*[^`]+`/ &&
-                 $line =~ /^(\s*)(````*)/) {                     # code `
+            $i--;
+            push @dest, &output_code(\@sub_line, $code_indent, $width);
+            while ($cnt_brank > 0) {
+                push @dest, "";
+                $cnt_brank--;
+            }
+        } elsif ($l !~ /^\s*````*[^`]+`/ &&
+                 $l =~ /^(\s*)(````*)/) {                     # code `
             my $space_len = length(&change_tab($1));
             my $quote_len = length($2);
-            $indent = &indent_offset($1, 0);
-            &buffer_flush();
-            $line = $line_next;
-            $line_next = <FILE>;
-            while ($line &&
-                   ($line !~ /^\s*(````*)\s*$/ || length($1) < $quote_len)) {
-                $text = &change_tab($line);
-                chop $text;
+            $Buffer && push @dest, &buffer_flush();
+            @sub_line = ();
+            while (++$i <= $#line && ($line[$i] !~ /^\s*(````*)\s*$/ ||
+                                       length($1) < $quote_len)) {
+                $text = &change_tab($line[$i]);
                 $text =~ s/^(\s*)//;
                 my $add_space = length($1) - $space_len;
                 if ($add_space > 0) {
                     $text = " " x $add_space . $text;
                 }
-                $text .= " " x ($TERM_WIDTH - $indent * 4 - length($text) - 4);
-
-                &print_indent($indent);
-                &bgrey_printf(12);
-                print "$text$COLOR_RESET\n";
-
-                $line = $line_next;
-                $line_next = <FILE>;
+                push @sub_line, $text;
             }
-        } elsif ($line !~ /^\s*~~~~*[^~]+~/ &&
-                 $line =~ /^(\s*)(~~~~*)/) {                     # code `
+            push @dest, &output_code(\@sub_line, 0, $width);
+        } elsif ($l !~ /^\s*~~~~*[^~]+~/ &&
+                 $l =~ /^(\s*)(~~~~*)/) {                     # code ~
             my $space_len = length(&change_tab($1));
             my $quote_len = length($2);
-            $indent = &indent_offset($1, 0);
-            &buffer_flush();
-            $line = $line_next;
-            $line_next = <FILE>;
-            while ($line &&
-                   ($line !~ /^\s*(~~~~*)\s*$/ || length($1) < $quote_len)) {
-                $text = &change_tab($line);
-                chop $text;
+            $Buffer && push @dest, &buffer_flush();
+            @sub_line = ();
+            while (++$i <= $#line && ($line[$i] !~ /^\s*(~~~~*)\s*$/ ||
+                                       length($1) < $quote_len)) {
+                $text = &change_tab($line[$i]);
                 $text =~ s/^(\s*)//;
                 my $add_space = length($1) - $space_len;
                 if ($add_space > 0) {
                     $text = " " x $add_space . $text;
                 }
-                $text .= " " x ($TERM_WIDTH - $indent * 4 - length($text) - 4);
-
-                &print_indent($indent);
-                &bgrey_printf(12);
-                print "$text$COLOR_RESET\n";
-
-                $line = $line_next;
-                $line_next = <FILE>;
+                push @sub_line, $text;
             }
-        } elsif ($line =~ /^\s*---/ && $line !~ /\|/) {     # bar
-            $line =~ s/^(\s*)//;
-            $indent = &indent_offset($1, 0);
-            &buffer_flush();
-            $text = " " x ($TERM_WIDTH - $indent * 4);
-            &print_indent($indent);
-            print "${COLOR_UNDERLINE}$text$COLOR_RESET\n";
-        } elsif ($line =~ /^(\s*)((>\s*)+)(.*)$/) {              # quate
-            my $l = 0;
-            my $ls = $2;
-            $text = $4;
-            $indent = &indent_offset($1, 0);
-            &buffer_flush();
-            $ls =~ s/\s//g;
-            $l = length($ls);
-            &print_indent($indent);
-            for ($i = 0; $i < $l; $i ++) {
-                &bgrey_printf(12);
-                print " ";
-                print "${COLOR_RESET}  ";
+            push @dest, &output_code(\@sub_line, 0, $width);
+        } elsif ($l =~ /^\s*>(.*$)/) {              # quote
+            my $t = $1;
+            $Buffer && push @dest, &buffer_flush();
+            @sub_line = ();
+            while ($i <= $#line) {
+                push @sub_line, $t;
+                $l = $line[++$i];
+                if ($l !~ /^\s*>(.*$)/) {
+                    last;
+                }
+                $t = $1;
             }
-            print "$text\n";
-        } elsif ($line =~ /\|/) {                                 # table
+            $i--;
+            @sub_line = &parse_markdown($width - 3, \@sub_line);
+            foreach $l (@sub_line) {
+                my $color = &get_bgrey(12);
+                push @dest, "$color $COLOR_RESET  $l";
+            }
+
+        } elsif ($l =~ /^(\s*)([\*\-\+]|[0-9]+\.)\s(.*)$/) {   # list
+            my $mark = $2;
+            my $text = $3;
+            my $indent = length($1) + length($2) + 1;
+            $Buffer && push @dest, &buffer_flush();
+            @sub_line = ();
+            push @sub_line, $text;
+            $f_cont = 1;
+            while (++$i <= $#line) {
+                $l = $line[$i];
+                if ($l =~ /^\s*$/) {
+                    push @sub_line, "";
+                    $f_cont = 0;
+                    next;
+                } elsif ($l =~ /^(\s*)([\*\-\+]|[0-9]+\.)\s/) {
+                    if (length($1) < $indent) {
+                        last;
+                    }
+                } elsif(!$f_cont &&
+                        ($l !~ /^(\s+)/ || length($1) < $indent)) {
+                    last;
+                } elsif($f_cont &&
+                        ($l !~ /^(\s+)/ || length($1) < $indent)) {
+                    $l =~ s/^\s*//;
+                    push @sub_line, $l;
+                    next;
+                }
+                $f_cont = 1;
+                push @sub_line, substr($l, $indent);
+            }
+            $i--;
+
+
+            my $space = "";
+            $indent = length($mark) + 1;
+            if ($indent < 4) {
+                $indent = 4;
+                $space = " " x ($indent - length($mark) - 1);
+            }
+            @sub_line = &parse_markdown($width - $indent, \@sub_line);
+            $l = shift(@sub_line);
+            push @dest, "$space$COLOR_FG_LCYAN$mark$COLOR_RESET $l";
+            $space = " " x $indent;
+            foreach $l (@sub_line) {
+                push @dest, "$space$l";
+            }
+        } elsif ($l =~ /^\s*---/ && $l !~ /\|/) {     # bar
+            $Buffer && push @dest, &buffer_flush();
+            my $t = " " x $width;
+            push @dest, "${COLOR_UNDERLINE}$t$COLOR_RESET\n";
+        } elsif ($l =~ /\|/) {                                 # table
             my @table, @l, @witdh, @lr;
             my $c = 0, $max_column = 0;
             my $head = -1;
 
-            &buffer_flush();
-            $line =~ s/^(\s*)//;
-            $indent = &indent_offset($1, 0);
-
-            while (1) {
-                chop $line;
-                $line =~ s/^\s*\|\s*//;
-                $line =~ s/\s*\|\s*$//;
-                if ($head < 0 && $line =~ /---/) {
-                    my @l;
+            $Buffer && push @dest, &buffer_flush();
+            do {
+                $l =~ s/^\s*//;
+                $l =~ s/^\|\s*//;
+                $l =~ s/\s*$//;
+                $l =~ s/\s*\|$//;
+                if ($head < 0 && $l =~ /---/) {
                     $head = $c - 1;
-                    @l = split(/\s*\|\s*/, $line);
-                    for ($i = 0; $i <= $#l; $i ++) {
-                        if ($l[$i] =~ /^\:.*\:$/) {
-                            $lr[$i] = 0;
-                        } elsif ($l[$i] =~ /\:$/) {
-                            $lr[$i] = 1;
+                    my @bar = split(/\s*\|\s*/, $l);
+                    my $j;
+                    for ($j = 0; $j <= $#bar; $j ++) {
+                        if ($bar[$j] =~ /^\:.*\:$/) {
+                            $lr[$j] = 0;
+                        } elsif ($bar[$j] =~ /\:$/) {
+                            $lr[$j] = 1;
                         } else {
-                            $lr[$i] = -1;
+                            $lr[$j] = -1;
                         }
                     }
                 } else {
-                    my @l, $i;
-                    @l = split(/\s*\|\s*/, $line);
-                    for ($i = 0; $i <= $#l; $i++) {
-                        $l[$i] = &inner_context($l[$i]);
+                    my @cell, $j;
+                    @cell = split(/\s*\|\s*/, $l);
+                    for ($j = 0; $j <= $#cell; $j++) {
+                        $cell[$j] = &inner_context($cell[$j]);
                     }
-                    $table[$c] = \@l;
-                    if ($max_column < $#l + 1) {
-                        $max_column = $#l + 1;
+                    $table[$c] = \@cell;
+                    if ($max_column < $#cell + 1) {
+                        $max_column = $#cell + 1;
                     }
-                    for ($i = 0; $i <= $#l; $i ++) {
-                        if ($width[$i] < length($l[$i])) {
-                            $width[$i] = length($l[$i]);
+                    for ($j = 0; $j <= $#cell; $j++) {
+                        if ($width[$j] < length($cell[$j])) {
+                            $width[$j] = length($cell[$j]);
                         }
                     }
                     $c++;
                 }
-                if ($line_next !~ /\|/) {
-                    last;                        # loop exit
-                }
-                $line = $line_next;
-                $line_next = <FILE>;
-            };
-            # print table
+
+                $l = $line[++$i];
+            } while ($i <= $#line && $l =~ /\|/);
+            $i--;
+
             my $x, $y;
             for ($y = 0; $y < $c; $y++) {
-                &print_indent($indent);
+                my $str = "";
+
                 for ($x = 0; $x < $max_column; $x++) {
-                    my $pad_l, $pad_r;
-                    if ($lr[$x] == -1) {
+                    my $pad_l, $pad_r, $color;
+                    if ($y <= $head) {
+                        $color = "$COLOR_REVERSE$COLOR_BOLD";
+                        $color .= &get_grey(($x % 2)*4 + 15);
+                    } else {
+                        $color = &get_bcolor256(0, $y % 2 + 1, ($x % 2)*2 + 2);
+                    }
+
+                    if ($lr[$x] == 1) {
                         $pad_l = " " x ($width[$x] - length($table[$y][$x]));
                         $pad_r = "";
-                    } elsif ($lr[$x] == 1) {
+                    } elsif ($lr[$x] == -1) {
                         $pad_l = "";
                         $pad_r = " " x ($width[$x] - length($table[$y][$x]));
                     } else {
                         $pad_l = " " x (($width[$x] - length($table[$y][$x])) / 2);
                         $pad_r = " " x ($width[$x] - length($table[$y][$x]) - length($pad_l));
                     }
-                    if ($y <= $head) {
-                        printf("$COLOR_REVERSE$COLOR_BOLD");
-                        &grey_printf(($x % 2)*4 + 15);
-                    } else {
-                        &bcolor256_printf(0, $y % 2 + 1, ($x % 2)*2 + 2);
-                    }
-                    print " $pad_l$table[$y][$x]$pad_r";
+                    $str .= "$color$pad_l $table[$y][$x]$pad_r";
                 }
-                print "$COLOR_RESET\n";
+                push @dest,  "$str$COLOR_RESET";
             }
-        } elsif ($line =~ /^(\s*)([\*\-\+]|[0-9]+\.)\s+(.*)$/) {   # list
-            $space = $1;
-            my $mark = $2;
-            $text = $3;
-            &buffer_flush();
-            $indent = &indent_offset($space, 1);
-            &print_indent($indent);
-            print "$COLOR_FG_LCYAN$mark$COLOR_RESET ";
-            &buffer_context($indent + 1, "$text\n", 1);
-        } elsif ($line =~ /^\s+$/) {                              # empty line
-            &buffer_flush();
-            print "\n";
-        } elsif ($line =~ /^(\s*)(#+)\s*([^\s].*)$/) {              # Header
-            $indent = &indent_offset($1, 0);
-            my ($l) = length($2);
-            $text = $3;
-            if (!@CountIndent) {
-                $indent = 0;
-            }
-            &print_header($l, $indent, $text);
-        } elsif ($line_next =~/^\s*\=+\s*$/) {                    # Header
-            $line =~ /^(\s*)([^\s].*)$/;
-            $indent = &indent_offset($1, 0);
-            my ($l) = length($2);
-            $text = $2;
-            if (!@CountIndent) {
-                $indent = 0;
-            }
-            &print_header(1, $indent, $text);
-            $line_next = <FILE>;
-        } elsif ($line_next =~/^\s*----+\s*$/) {                  # Header
-            $line =~ /^(\s*)([^\s].*)$/;
-            $indent = &indent_offset($1, 0);
-            my ($l) = length($2);
-            $text = $2;
-            if (!@CountIndent) {
-                $indent = 0;
-            }
-            &print_header(2, $indent, $text);
-            $line_next = <FILE>;
+        } elsif ($l =~ /^\s*$/) {                              # empty line
+            $Buffer && push @dest, &buffer_flush();
+            push @dest, "";
+            $f_cont = 0;
+        } elsif ($l =~ /^\s*(#+)\s+([^\s].*)$/) {              # Header  #+
+            my $level = length($1);
+            my $t = $2;
+            $Buffer && push @dest, &buffer_flush();
+            push @dest, &output_header($level, $width, $t);
+        } elsif ($line[$i+1] =~/^\s*\=+\s*$/) {                    # Header ==
+            $l =~ /^(\s*)([^\s].*)$/;
+            $Buffer && push @dest, &buffer_flush();
+            push @dest, &output_header(1, $width, $l);
+            $i++;
+        } elsif ($line[$i+1] =~/^\s*-+\s*$/) {                     # Header --
+            $l =~ /^(\s*)([^\s].*)$/;
+            $Buffer && push @dest, &buffer_flush();
+            push @dest, &output_header(2, $width, $l);
+            $i++;
         } else {                                                  # content
-            $line =~ s/^(\s*)//;
-            $indent = &indent_offset($1, 0);
-            &buffer_context($indent, $line, 0);
+            $l =~ s/^(\s*)//;
+            &buffer_context($l);
+            $f_cont = 1;
         }
-        $line = $line_next;
-        $line_next = <FILE>;
     }
-    &buffer_flush();
+    $Buffer && push @dest, &buffer_flush();
+
+    return @dest;
 }
 
-exit 0;
 
-sub print_header {
-    my ($l, $indent, $text) = @_;
+sub output_header {
+    my ($l, $width, $text) = @_;
 
-    &buffer_flush();
     $text = &inner_context($text);
 
-    if ($indent > 0) {
-        &print_indent($indent);
-    }
     if ($l == 1) {
-        $text .= " " x ($TERM_WIDTH - $indent * 4 - length($text));
-        print "${COLOR_BG_YELLOW}$text$COLOR_RESET\n";
+        $text .= " " x ($width - length($text));
+        return  "${COLOR_BG_YELLOW}$text$COLOR_RESET";
     } elsif ($l == 2) {
-        $text .= " " x ($TERM_WIDTH  - $indent * 4 - length($text));
-        print "${COLOR_UNDERLINE}${COLOR_BOLD}${COLOR_FG_LYELLOW}";
-        print "$text$COLOR_RESET\n";
-    } else {
-        print "${COLOR_BOLD}${COLOR_FG_LYELLOW}$text$COLOR_RESET\n";
+        $text .= " " x ($width - length($text));
+        return "${COLOR_UNDERLINE}${COLOR_BOLD}${COLOR_FG_LYELLOW}" .
+            "$text$COLOR_RESET";
     }
+    return "${COLOR_BOLD}${COLOR_FG_LYELLOW}$text$COLOR_RESET";
 }
 
 sub print_indent {
@@ -388,44 +411,36 @@ sub indent_offset {
     return 1;
 }
 
-sub print_code {
-    my ($text, $indent, $min_indent) = @_;
-    my $line, $blank;
+sub output_code {
+    my ($lines, $min_indent, $width) = @_;
+    my $l, $pre_seq, @dest;
 
-    $text =~ s/(\n*)$//;   # delete black lines in last part
-    $blank = $1;
-    foreach $line (split /\n/, $text) {
-        if (length ($line) > $min_indent) {
-            $line = substr($line, $min_indent);
+    @dest = ();
+    foreach $l (@$lines) {
+        if (length($l) > $min_indent) {
+            $l = substr($l, $min_indent);
         }
-        $line .= " " x ($TERM_WIDTH - length($line) - 8);
-        &print_indent($indent);
-        &bgrey_printf(12);
-        print "$line$COLOR_RESET\n";
+        $pre_seq = &get_bgrey(12);
+        $l .= " " x ($width - length($l) - 4);
+
+        push @dest, "$pre_seq$l$COLOR_RESET";
     }
-    chop $blank;
-    print "$blank";
+
+    return @dest;
 }
 
 sub buffer_context {
-    my ($indent, $text, $f_list) = @_;
+    my ($text) = @_;
 
-    if ($f_list) {
-        &buffer_flush();
-        $Flist = 1;
-    }
-
-    if (length($Buffer) == 0) {
-        $BufferIndent = $indent;
-    }
-    $Buffer .= $text;
+    $Buffer .= "$text\n";
 }
 
 sub buffer_flush {
     my ($text) = $Buffer;
+    my @dest = ();
 
     if (length($text) == 0) {
-        return;
+        return @dest;
     }
 
     # image link
@@ -462,14 +477,11 @@ sub buffer_flush {
             $post_seq = "$COLOR_RESET";
         }
 
-        if ($Flist) {
-            $Flist = 0;
-        } else {
-            &print_indent($BufferIndent);
-        }
-        print "$pre_seq$line$post_seq\n";
+        push @dest, "$pre_seq$line$post_seq";
     }
     $Buffer = "";
+
+    return @dest;
 }
 
 sub inner_context {
@@ -495,29 +507,33 @@ sub inner_context {
 }
 
 # 256 color r,g,b [0-5]
-sub bcolor256_printf {
+sub get_color256 {
     my ($r, $g, $b) = @_;
     my $c = 16 + 36 * $r+ 6 * $g + $b;
-    printf("\033[38;5;${c}m");
+
+    return "\033[38;5;${c}m";
 }
 
 # 256 color r,g,b [0-5] backgound
-sub bcolor256_printf {
+sub get_bcolor256 {
     my ($r, $g, $b) = @_;
     my $c = 16 + 36 * $r+ 6 * $g + $b;
-    printf("\033[48;5;${c}m");
+
+    return "\033[48;5;${c}m";
 }
 
 # 256 color gley scale [0-23]
-sub grey_printf {
+sub get_grey {
     my ($l) = @_;
     my $c = 232 + $l;
-    printf("\033[38;5;${c}m");
+
+    return "\033[38;5;${c}m";
 }
 
 # 256 color gley scale [0-23] background
-sub bgrey_printf {
+sub get_bgrey {
     my ($l) = @_;
     my $c = 232 + $l;
-    printf("\033[48;5;${c}m");
+
+    return "\033[48;5;${c}m";
 }
