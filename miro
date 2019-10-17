@@ -465,7 +465,7 @@ sub buffer_flush {
     my $next_seq = "";
     foreach $line (split /\n/, $text) {
         $pre_seq = $next_seq;
-        if ($line =~ /(\x1b\[[^m]+m).*$/) {
+        if ($line =~ /(\x1b\[[^m]+m)[^\x1b]*$/) {
             $next_seq = $1;
             if ($next_seq eq $COLOR_RESET) {
                 $next_seq = "";
