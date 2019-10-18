@@ -121,8 +121,7 @@ sub parse_markdown {
                 push @dest, "";
                 $cnt_brank--;
             }
-        } elsif ($l !~ /^\s*````*[^`]+`/ &&
-                 $l =~ /^(\s*)(````*)/) {                     # code `
+        } elsif ($l !~ /^\s*````*[^`]+`/ && $l =~ /^(\s*)(````*)/) { # code `
             my $space_len = length(&change_tab($1));
             my $quote_len = length($2);
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
@@ -138,8 +137,7 @@ sub parse_markdown {
                 push @sub_line, $text;
             }
             push @dest, &add_pad($pad, &output_code(\@sub_line, 0, $width));
-        } elsif ($l !~ /^\s*~~~~*[^~]+~/ &&
-                 $l =~ /^(\s*)(~~~~*)/) {                     # code ~
+        } elsif ($l !~ /^\s*~~~~*[^~]+~/ && $l =~ /^(\s*)(~~~~*)/) { # code ~
             my $space_len = length(&change_tab($1));
             my $quote_len = length($2);
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
@@ -188,7 +186,11 @@ sub parse_markdown {
                     push @sub_line, "";
                     $f_cont = 0;
                     next;
-                } elsif ($l =~ /^(\s*)([\*\-\+]|[0-9]+\.)\s/) {
+                } elsif ($l =~ /^(\s*)([\*\-\+]|[0-9]+\.)\s/ ||
+                         ($l !~ /^\s*````*[^`]+`/ && $l =~ /^(\s*)(````*)/) ||
+                         ($l !~ /^\s*~~~~*[^~]+~/ && $l =~ /^(\s*)(~~~~*)/) ||
+                         ($l =~ /^\s*>(.*$)/) ||
+                         ($l =~ /^\s*(#+)\s+([^\s].*)$/)) {
                     if (length($1) < $indent) {
                         last;
                     }
@@ -304,6 +306,7 @@ sub parse_markdown {
         } elsif ($l =~ /^\s*(#+)\s+([^\s].*)$/) {              # Header  #+
             my $level = length($1);
             my $t = $2;
+            $t =~ s/#+\s*$//;
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             push @dest, &output_header($level, $width, $t);
         } elsif ($line[$i+1] =~/^\s*\=+\s*$/) {                # Header ==
