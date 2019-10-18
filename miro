@@ -65,7 +65,7 @@ foreach $infile (@ARGV) {
     my $i;
 
     for ($i = 0; $i <= $#lines; $i++) {
-        chop $lines[$i];
+        $lines[$i] =~ s/\n$//;
     }
 
     $Buffer = "";
