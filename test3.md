@@ -35,3 +35,21 @@
 ## header2(open)
 
    * list
+   ````
+   code (not in list)
+   ````
+
+   * list
+     ````
+     code (in list)
+     ````
+
+   * list
+
+   ````
+   code (not in list)
+   ````
+
+
+   * list
+   ## not in list
