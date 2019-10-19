@@ -3,7 +3,12 @@
 # Copyright (c) 2019 TAKESHI MIURA
 # https://github.com/tksmiura/miro
 use utf8;
+use feature 'unicode_strings';
+use Encode;
 use Data::Dumper;
+
+binmode STDIN,  ":utf8";
+binmode STDOUT, ":utf8";
 
 $TAB_WITDH        = 8;
 
@@ -59,7 +64,7 @@ if (! -t STDOUT) {
 }
 
 foreach $infile (@ARGV) {
-    open(FILE, "<$infile") || die "Can't open to $infile";
+    open FILE, '<:encoding(UTF-8)', $infile || die "Can't open to $infile";
     my @lines = <FILE>;
     my @dest;
     my $i;
@@ -279,22 +284,23 @@ sub parse_markdown {
 
                 for ($x = 0; $x < $max_column; $x++) {
                     my $pad_l, $pad_r, $color;
+                    my $width_cell;
                     if ($y <= $head) {
                         $color = "$COLOR_REVERSE$COLOR_BOLD";
                         $color .= &get_grey(($x % 2) * 2 + 20);
                     } else {
                         $color = &get_bcolor256(0, $y % 2 + 1, $x % 2);
                     }
-
+                    $width_cell = &width_str($table[$y][$x]);
                     if ($lr[$x] == 1) {
-                        $pad_l = " " x ($width[$x] - length($table[$y][$x]));
+                        $pad_l = " " x ($width[$x] - $width_cell);
                         $pad_r = "";
                     } elsif ($lr[$x] == -1) {
                         $pad_l = "";
-                        $pad_r = " " x ($width[$x] - length($table[$y][$x]));
+                        $pad_r = " " x ($width[$x] - $width_cell);
                     } else {
-                        $pad_l = " " x (($width[$x] - length($table[$y][$x])) / 2);
-                        $pad_r = " " x ($width[$x] - length($table[$y][$x]) - length($pad_l));
+                        $pad_l = " " x (($width[$x] - $width_cell) / 2);
+                        $pad_r = " " x ($width[$x] - $width_cell - length($pad_l));
                     }
                     $str .= "$color$pad_l $table[$y][$x]$pad_r";
                 }
@@ -351,10 +357,10 @@ sub output_header {
 
     if ($l == 1) {
         my $bg = &get_bcolor256(1,1, 0);
-        $text .= " " x ($width - length($text));
+        $text .= " " x ($width - &width_str($text));
         return  "$bg$COLOR_BOLD$text$COLOR_RESET";
     } elsif ($l == 2) {
-        $text .= " " x ($width - length($text));
+        $text .= " " x ($width - &width_str($text));
         return "$COLOR_UNDERLINE$COLOR_BOLD$COLOR_FG_LYELLOW$text$COLOR_RESET";
     } elsif ($l == 3) {
         return "$COLOR_BOLD$COLOR_FG_LYELLOW$text$COLOR_RESET";
@@ -557,4 +563,33 @@ sub get_bgrey {
     my $c = 232 + $l;
 
     return "\033[48;5;${c}m";
+}
+
+# get string width in console
+#
+# TODO: not support all code in unicode
+# now checking below
+#
+#    ASCII [\x20-\x7E]   1
+#    hankaku kana(japan) 1  (?:\xEF\xBD[\xA1-\xBF]|\xEF\xBE[\x80-\x9F])
+#    latin?(utf8 2byte)  1  (?:[\xC2-\xDF][\x80-\xBF])
+#    other               2
+sub width_str {
+    my ($str) = @_;
+    my $c, $u, $w = 0;
+
+    $c = $str;
+    foreach $c (split //, $str) {
+        $u = encode_utf8($c);
+        if ( $u !~ /(?:\xEF\xBD[\xA1-\xBF]|\xEF\xBE[\x80-\x9F])|(?:[\xC2-\xDF][\x80-\xBF])|[\x20-\x7E]/ ) {
+            $w += 2;
+            #print "debug width_str '$c' = 2\n";
+        } else {
+            $w += 1;
+            #print "debug width_str '$c' = 1\n";
+        }
+
+    }
+
+    return $w;
 }
