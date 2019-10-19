@@ -224,8 +224,9 @@ sub parse_markdown {
             }
         } elsif ($l =~ /^\s*---/ && $l !~ /\|/) {     # bar
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
-            my $t = " " x ($width + $pad);
-            push @dest, "${COLOR_UNDERLINE}$t$COLOR_RESET\n";
+            my $bar = " " x ($width + $pad);
+            my $color = &get_grey(8);
+            push @dest, "$COLOR_UNDERLINE$color$bar$COLOR_RESET\n";
         } elsif ($l =~ /\|/) {                                 # table
             my @table, @l, @witdh, @lr;
             my $c = 0, $max_column = 0;
@@ -280,9 +281,9 @@ sub parse_markdown {
                     my $pad_l, $pad_r, $color;
                     if ($y <= $head) {
                         $color = "$COLOR_REVERSE$COLOR_BOLD";
-                        $color .= &get_grey(($x % 2)*4 + 15);
+                        $color .= &get_grey(($x % 2) * 2 + 20);
                     } else {
-                        $color = &get_bcolor256(0, $y % 2 + 1, ($x % 2)*2 + 2);
+                        $color = &get_bcolor256(0, $y % 2 + 1, $x % 2);
                     }
 
                     if ($lr[$x] == 1) {
@@ -349,14 +350,16 @@ sub output_header {
     $text = &inner_context($text);
 
     if ($l == 1) {
+        my $bg = &get_bcolor256(1,1, 0);
         $text .= " " x ($width - length($text));
-        return  "${COLOR_BG_YELLOW}$text$COLOR_RESET";
+        return  "$bg$COLOR_BOLD$text$COLOR_RESET";
     } elsif ($l == 2) {
         $text .= " " x ($width - length($text));
-        return "${COLOR_UNDERLINE}${COLOR_BOLD}${COLOR_FG_LYELLOW}" .
-            "$text$COLOR_RESET";
+        return "$COLOR_UNDERLINE$COLOR_BOLD$COLOR_FG_LYELLOW$text$COLOR_RESET";
+    } elsif ($l == 3) {
+        return "$COLOR_BOLD$COLOR_FG_LYELLOW$text$COLOR_RESET";
     }
-    return "${COLOR_BOLD}${COLOR_FG_LYELLOW}$text$COLOR_RESET";
+    return "$COLOR_FG_LYELLOW$text$COLOR_RESET";
 }
 
 sub print_indent {
@@ -437,7 +440,7 @@ sub output_code {
         if (length($l) > $min_indent) {
             $l = substr($l, $min_indent);
         }
-        $pre_seq = &get_bgrey(12);
+        $pre_seq = &get_bgrey(6);
         $l .= " " x ($width - length($l) - 4);
 
         push @dest, "$pre_seq$l$COLOR_RESET";
@@ -472,7 +475,8 @@ sub buffer_flush {
     $text =~ s/\*([^\*]+)\*/${COLOR_FG_RED}$1$COLOR_RESET/g;
 
     # code
-    $text =~ s/`(`*[^`]+`*)`/${COLOR_BG_LBLACK}$1$COLOR_RESET/g;
+    my $back_grey = &get_bgrey(6);
+    $text =~ s/`(`*[^`]+`*)`/$back_grey$1$COLOR_RESET/g;
 
     # <br>
     $text =~ s/<[bB][rR]>//g;
