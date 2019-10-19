@@ -224,7 +224,7 @@ sub parse_markdown {
             }
         } elsif ($l =~ /^\s*---/ && $l !~ /\|/) {     # bar
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
-            my $t = " " x $width;
+            my $t = " " x ($width + $pad);
             push @dest, "${COLOR_UNDERLINE}$t$COLOR_RESET\n";
         } elsif ($l =~ /\|/) {                                 # table
             my @table, @l, @witdh, @lr;
@@ -308,16 +308,16 @@ sub parse_markdown {
             my $t = $2;
             $t =~ s/#+\s*$//;
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
-            push @dest, &output_header($level, $width, $t);
+            push @dest, &output_header($level, $width + $pad, $t);
         } elsif ($line[$i+1] =~/^\s*\=+\s*$/) {                # Header ==
             $l =~ /^(\s*)([^\s].*)$/;
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
-            push @dest, &output_header(1, $width, $l);
+            push @dest, &output_header(1, $width + $pad, $l);
             $i++;
         } elsif ($line[$i+1] =~/^\s*-+\s*$/) {                 # Header --
             $l =~ /^(\s*)([^\s].*)$/;
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
-            push @dest, &output_header(2, $width, $l);
+            push @dest, &output_header(2, $width + $pad, $l);
             $i++;
         } else {                                               # content
             $l =~ s/^(\s*)//;
