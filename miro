@@ -5,6 +5,8 @@
 use utf8;
 use feature 'unicode_strings';
 use Encode;
+use Getopt::Long;
+use File::Temp 'tempfile';
 use Data::Dumper;
 
 binmode STDIN,  ":utf8";
@@ -57,8 +59,12 @@ $COLOR_RESET      = "\x1b[0m";
 $TERM_WIDTH       = `tput cols`;
 $TERM_HEIGHT      = `tput lines`;
 
+#options
+# -l -less : to use '|less -R'
+GetOptions('less' => \$opt_less, 'debug' => \$opt_debug);
+
 # test tty
-if (! -t STDOUT) {
+if (!$opt_less && ! -t STDOUT) {
     printf "not terminal\n";
     exit 1;
 }
@@ -126,9 +132,11 @@ sub parse_markdown {
                 push @dest, "";
                 $cnt_brank--;
             }
-        } elsif ($l !~ /^\s*````*[^`]+`/ && $l =~ /^(\s*)(````*)/) { # code `
+        } elsif ($l !~ /^\s*````*[^`]+`/ && $l =~ /^(\s*)(````*)(.*)/) { # code `
             my $space_len = length(&change_tab($1));
             my $quote_len = length($2);
+            my $lang = $3;
+            $opt_debug && print STDERR "code block $lang\n";
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             @sub_line = ();
             while (++$i <= $#line && ($line[$i] !~ /^\s*(````*)\s*$/ ||
@@ -141,7 +149,7 @@ sub parse_markdown {
                 }
                 push @sub_line, $text;
             }
-            push @dest, &add_pad($pad, &output_code(\@sub_line, 0, $width));
+            push @dest, &add_pad($pad, &output_code(\@sub_line, 0, $width, $lang));
         } elsif ($l !~ /^\s*~~~~*[^~]+~/ && $l =~ /^(\s*)(~~~~*)/) { # code ~
             my $space_len = length(&change_tab($1));
             my $quote_len = length($2);
@@ -437,19 +445,51 @@ sub indent_offset {
     return 1;
 }
 
+
+
 sub output_code {
-    my ($lines, $min_indent, $width) = @_;
-    my $l, $pre_seq, @dest;
+    my ($lines, $min_indent, $width, $lang) = @_;
+    my $l, $pre_seq, @dest, $ext;
 
-    @dest = ();
-    foreach $l (@$lines) {
-        if (length($l) > $min_indent) {
-            $l = substr($l, $min_indent);
+    if ($lang =~ /[cC]/) {
+        $ext = ".c";
+    } elsif ($lang =~ /perl/) {
+        $ext = ".pl";
+    } elsif ($lang =~ /ruby/) {
+        $ext = ".rb";
+    } elsif ($lang =~ /python/) {
+        $ext = ".py";
+    }
+    if ($ext) {
+        my ($tempfh, $tempfile) = tempfile(SUFFIX => $ext);
+        binmode $tempfh, ":utf8";
+        @dest = ();
+        foreach $l (@$lines) {
+            if (length($l) > $min_indent) {
+                $l = substr($l, $min_indent);
+            }
+            $l .= " " x ($width - length($l) - 4);
+            print $tempfh "$l\n";
         }
-        $pre_seq = &get_bgrey(6);
-        $l .= " " x ($width - length($l) - 4);
-
-        push @dest, "$pre_seq$l$COLOR_RESET";
+        close $tempfh;
+        @dest = `/usr/share/source-highlight/src-hilite-lesspipe.sh $tempfile`;
+        chop(@dest);
+        $pre_seq = &get_bgrey(3);
+        for (my $i; $i < @dest; $i++) {
+            my $ll = decode("utf8", $dest[$i]);
+            $ll =~ s/\x1b\[m/\x1b\[m$pre_seq/g;
+            $dest[$i] = "$pre_seq$ll$COLOR_RESET";
+        }
+    } else {
+        @dest = ();
+        foreach $l (@$lines) {
+            if (length($l) > $min_indent) {
+                $l = substr($l, $min_indent);
+            }
+            $pre_seq = &get_bgrey(6);
+            $l .= " " x ($width - length($l) - 4);
+            push @dest, "$pre_seq$l$COLOR_RESET";
+        }
     }
 
     return @dest;

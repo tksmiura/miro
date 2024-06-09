@@ -14,7 +14,7 @@
 
 backquate
 
-```
+```perl
 &bcolor256_printf(1, 1, 2);
 print "test$COLOR_RESET\n\n";
 ```
