@@ -5,9 +5,14 @@
 use utf8;
 use feature 'unicode_strings';
 use Encode;
+use Text::VisualWidth::PP;
 use Getopt::Long;
 use File::Temp 'tempfile';
 use Data::Dumper;
+
+
+$use_TextVisualWidthPP = 1;
+$Text::VisualWidth::PP::EastAsian = 1;     # East asian ambigious width
 
 binmode STDIN,  ":utf8";
 binmode STDOUT, ":utf8";
@@ -61,7 +66,7 @@ $TERM_HEIGHT      = `tput lines`;
 
 #options
 # -l -less : to use '|less -R'
-GetOptions('less' => \$opt_less, 'debug' => \$opt_debug);
+GetOptions('less' => \$opt_less, 'present' => \$opt_p, 'debug' => \$opt_debug, 'iterm2' => \$opt_iterm2, 'sixel' => \$opt_sixel);
 
 # test tty
 if (!$opt_less && ! -t STDOUT) {
@@ -468,7 +473,7 @@ sub output_code {
             if (length($l) > $min_indent) {
                 $l = substr($l, $min_indent);
             }
-            $l .= " " x ($width - length($l) - 4);
+            $l .= " " x ($width - &width_str($l) - 4);
             print $tempfh "$l\n";
         }
         close $tempfh;
@@ -487,7 +492,7 @@ sub output_code {
                 $l = substr($l, $min_indent);
             }
             $pre_seq = &get_bgrey(6);
-            $l .= " " x ($width - length($l) - 4);
+            $l .= " " x ($width - &width_str($l) - 4);
             push @dest, "$pre_seq$l$COLOR_RESET";
         }
     }
@@ -606,30 +611,29 @@ sub get_bgrey {
 }
 
 # get string width in console
-#
-# TODO: not support all code in unicode
-# now checking below
-#
-#    ASCII [\x20-\x7E]   1
-#    hankaku kana(japan) 1  (?:\xEF\xBD[\xA1-\xBF]|\xEF\xBE[\x80-\x9F])
-#    latin?(utf8 2byte)  1  (?:[\xC2-\xDF][\x80-\xBF])
-#    other               2
 sub width_str {
     my ($str) = @_;
-    my $c, $u, $w = 0;
+    if ($use_TextVisualWidthPP)  {
+        return Text::VisualWidth::PP::width($str);
+    } else {
+        # TODO: not support all code in unicode
+        # now checking below
+        #
+        #    ASCII [\x20-\x7E]   1
+        #    hankaku kana(japan) 1  (?:\xEF\xBD[\xA1-\xBF]|\xEF\xBE[\x80-\x9F])
+        #    latin?(utf8 2byte)  1  (?:[\xC2-\xDF][\x80-\xBF])
+        #    other               2
+        my $c, $u, $w = 0;
 
-    $c = $str;
-    foreach $c (split //, $str) {
-        $u = encode_utf8($c);
-        if ( $u !~ /(?:\xEF\xBD[\xA1-\xBF]|\xEF\xBE[\x80-\x9F])|(?:[\xC2-\xDF][\x80-\xBF])|[\x20-\x7E]/ ) {
-            $w += 2;
-            #print "debug width_str '$c' = 2\n";
-        } else {
-            $w += 1;
-            #print "debug width_str '$c' = 1\n";
+        $c = $str;
+        foreach $c (split //, $str) {
+            $u = encode_utf8($c);
+            if ( $u !~ /(?:\xEF\xBD[\xA1-\xBF]|\xEF\xBE[\x80-\x9F])|(?:[\xC2-\xDF][\x80-\xBF])|[\x20-\x7E]/ ) {
+                $w += 2;
+            } else {
+                $w += 1;
+            }
         }
-
+        return $w;
     }
-
-    return $w;
 }
