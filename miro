@@ -280,8 +280,9 @@ sub parse_markdown {
                         $max_column = $#cell + 1;
                     }
                     for ($j = 0; $j <= $#cell; $j++) {
-                        if ($width[$j] < length($cell[$j])) {
-                            $width[$j] = length($cell[$j]);
+                        my $w = &width_str($cell[$j]);
+                        if ($width[$j] < $w) {
+                            $width[$j] = $w;
                         }
                     }
                     $c++;
@@ -515,7 +516,9 @@ sub buffer_flush {
     }
 
     # image link
-    $text =~ s/\!\[(.*)\]\(([^\)]+)\)/[$COLOR_FG_GREEN$1$COLOR_RESET]/g;
+    if (!$opt_iterm2 && ! $opt_sixel) {
+        $text =~ s/\!\[(.*)\]\(([^\)]+)\)/[$COLOR_FG_GREEN$1$COLOR_RESET]/g;
+    }
 
     # URL
     $text =~ s/\[(.*)\]\([^\]]*\)/$COLOR_FG_CYAN$COLOR_UNDERLINE$1$COLOR_RESET/g;
