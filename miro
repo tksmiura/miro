@@ -9,6 +9,8 @@ use Text::VisualWidth::PP;
 use Getopt::Long;
 use File::Temp 'tempfile';
 use Data::Dumper;
+use Term::ReadKey;
+
 
 
 $use_TextVisualWidthPP = 1;
@@ -70,8 +72,14 @@ GetOptions('less' => \$opt_less, 'present' => \$opt_p, 'debug' => \$opt_debug, '
 
 # test tty
 if (!$opt_less && ! -t STDOUT) {
-    printf "not terminal\n";
+    print "not terminal\n";
     exit 1;
+}
+
+if ($opt_p) {
+    ReadMode 4;         # Key Input mode
+    print "\x1b[2J";    # Clear all screen
+    print "\x1b[1;1H";  # move left top
 }
 
 foreach $infile (@ARGV) {
@@ -91,7 +99,34 @@ foreach $infile (@ARGV) {
     }
 }
 
+if ($opt_p) {
+    my $key = &wait_key();
+    print "key = '$key'\n";
+    ReadMode 0;
+}
+
 exit 0;
+
+sub wait_key {
+    my $key = ReadKey(0);
+    if (ord($key) == 27) {
+        my $next = ord(ReadKey(-1));
+        if ($next == 91) {
+            my $arrow = ord(ReadKey(-1));
+            if ($arrow == 68) {
+                return "Left";
+            } elsif ($arrow = 67) {
+                return "Right";
+            } elsif ($arrow = 67) {
+                return "Up";
+            } elsif ($arrow = 67) {
+                return "Down";
+            }
+        }
+        return "";  # unknow control key"
+    }
+    return $key;
+}
 
 sub parse_markdown {
     my ($width, $pad, $lines) = @_;
