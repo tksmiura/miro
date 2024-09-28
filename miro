@@ -92,16 +92,32 @@ foreach $infile (@ARGV) {
         $lines[$i] =~ s/\n$//;
     }
 
-    $Buffer = "";
-    @dest = &parse_markdown($TERM_WIDTH - 4, 4, \@lines);
-    foreach $l (@dest) {
-        print "$l\n";
+    if (! $opt_p) {
+        $Buffer = "";
+        @dest = &parse_markdown($TERM_WIDTH - 4, 4, \@lines);
+        foreach $l (@dest) {
+            print "$l\n";
+        }
+    } else {  # presentation mode
+        my $pages = &parse_page(\@lines);
+
+        foreach my $p (@$pages) {
+            my @lines = @$p;
+            foreach my $l (@lines) {
+                print "$l\n";
+            }
+            my $key = &wait_key();
+            if ($key eq "q") {
+                last;
+            }
+            print "\x1b[2J";    # Clear all screen
+            print "\x1b[1;1H";  # move left top
+        }
     }
+
 }
 
 if ($opt_p) {
-    my $key = &wait_key();
-    print "key = '$key'\n";
     ReadMode 0;
 }
 
@@ -126,6 +142,53 @@ sub wait_key {
         return "";  # unknow control key"
     }
     return $key;
+}
+
+
+sub parse_page {
+    my ($lines) = @_;
+    my @line = @$lines;
+    my @pages = ();
+    my @context = ();
+
+    for ($i = 0; $i <= $#line; $i++) {
+        if ($line[$i] =~ /^ {0,3}(#+)\s+([^\s].*)$/) {         # Header  #+
+            if (@content) {
+                 my @c = &parse_markdown($TERM_WIDTH - 4, 4, \@content);
+                 push @pages, \@c;
+                 @content = ();
+            }
+            push @content, $line[$i];
+        } elsif ($line[$i+1] =~/^\s*\=+\s*$/) {                # Header ==
+            if (@content) {
+                my @c = &parse_markdown($TERM_WIDTH - 4, 4, \@content);
+                push @pages, \@c;
+                @content = ();
+            }
+            push @content, $line[$i];
+            $i++;
+            push @content, $line[$i];
+        } elsif ($line[$i+1] =~/^\s*-+\s*$/) {                 # Header --
+            if (@content) {
+                my @c = &parse_markdown($TERM_WIDTH - 4, 4, \@content);
+                push @pages, \@c;
+                @content = ();
+            }
+            push @content, $line[$i];
+            $i++;
+            push @content, $line[$i];
+        } else {                                               # content
+            push @content, $line[$i];
+        }
+    }
+    if (@content) {
+        my @c = &parse_markdown($TERM_WIDTH - 4, 4, \@content);
+        push @pages, \@c;
+        @content = ();
+    }
+#    print Dumper(@pages);
+
+    return \@pages;
 }
 
 sub parse_markdown {
