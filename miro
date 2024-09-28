@@ -99,9 +99,11 @@ foreach $infile (@ARGV) {
             print "$l\n";
         }
     } else {  # presentation mode
-        my $pages = &parse_page(\@lines);
+        my $p = &parse_page(\@lines);
+        my @pages = @$p;
 
-        foreach my $p (@$pages) {
+        for (my $i = 0; $i <= $#pages; $i++) {
+            my $p =  $pages[$i];
             my @lines = @$p;
             foreach my $l (@lines) {
                 print "$l\n";
@@ -109,6 +111,11 @@ foreach $infile (@ARGV) {
             my $key = &wait_key();
             if ($key eq "q") {
                 last;
+            } elsif ($key eq "p" ||
+                     $key eq "Left") {
+                if ($i > 0) {
+                    $i -= 2;
+                }
             }
             print "\x1b[2J";    # Clear all screen
             print "\x1b[1;1H";  # move left top
@@ -151,7 +158,7 @@ sub parse_page {
     my @pages = ();
     my @context = ();
 
-    for ($i = 0; $i <= $#line; $i++) {
+    for (my $i = 0; $i <= $#line; $i++) {
         if ($line[$i] =~ /^ {0,3}(#+)\s+([^\s].*)$/) {         # Header  #+
             if (@content) {
                  my @c = &parse_markdown($TERM_WIDTH - 4, 4, \@content);
