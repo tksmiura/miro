@@ -295,10 +295,12 @@ sub parse_markdown {
                 push @dest, "$pad_s$color $COLOR_RESET  $l";
             }
 
-        } elsif ($l =~ /^(\s*)([\*\-\+]|[0-9]+\.)\s(.*)$/) {   # list
+        } elsif ($l =~ /^(\s*)([\*\-\+]\s*\[.\]|[\*\-\+]|[0-9]+\.)\s(.*)$/) {   # list
             my $mark = $2;
             my $text = $3;
-            my $indent = length($1) + length($2) + 1;
+            print "enter $2 $3\n";
+            #my $indent = length($1) + length($2) + 1;
+            my $indent = length($1) + 1;
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             @sub_line = ();
             push @sub_line, $text;
@@ -314,14 +316,14 @@ sub parse_markdown {
                          ($l !~ /^\s*~~~~*[^~]+~/ && $l =~ /^(\s*)(~~~~*)/) ||
                          ($l =~ /^(\s*)>/) ||
                          ($l =~ /^(\s*)(#+)\s+([^\s].*)$/)) {
-                    if (length($1) < $indent) {
+                    if (length($1) <= $indent) {
                         last;
                     }
                 } elsif(!$f_cont &&
-                        ($l !~ /^(\s+)/ || length($1) < $indent)) {
+                        ($l !~ /^(\s+)/ || length($1) <= $indent)) {
                     last;
                 } elsif($f_cont &&
-                        ($l !~ /^(\s+)/ || length($1) < $indent)) {
+                        ($l !~ /^(\s+)/ || length($1) <= $indent)) {
                     $l =~ s/^\s*//;
                     push @sub_line, $l;
                     next;
@@ -331,12 +333,15 @@ sub parse_markdown {
             }
             $i--;
 
-
             my $space = "";
-            $indent = length($mark) + 1;
+            $mark =~ /^([^\s]*)/;
+            $indent = length($1) + 1;
             if ($indent < 4) {
+                $space = " " x (4 - $indent);
                 $indent = 4;
-                $space = " " x ($indent - length($mark) - 1);
+            }
+            if (length($mark) + 1 + length($space) > $indent) {
+                $indent = length($mark) + 1 + length($space);
             }
             @sub_line = &parse_markdown($width - $indent, 0, \@sub_line);
             $l = shift(@sub_line);
@@ -345,6 +350,7 @@ sub parse_markdown {
             foreach $l (@sub_line) {
                 push @dest, "$pad_s$space$l";
             }
+            print "exit\n"
         } elsif ($l =~ /^\s*---/ && $l !~ /\|/) {     # bar
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             my $bar = " " x ($width + $pad);
