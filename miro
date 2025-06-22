@@ -298,7 +298,6 @@ sub parse_markdown {
         } elsif ($l =~ /^(\s*)([\*\-\+]\s*\[.\]|[\*\-\+]|[0-9]+\.)\s(.*)$/) {   # list
             my $mark = $2;
             my $text = $3;
-            print "enter $2 $3\n";
             #my $indent = length($1) + length($2) + 1;
             my $indent = length($1) + 1;
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
@@ -350,7 +349,6 @@ sub parse_markdown {
             foreach $l (@sub_line) {
                 push @dest, "$pad_s$space$l";
             }
-            print "exit\n"
         } elsif ($l =~ /^\s*---/ && $l !~ /\|/) {     # bar
             $Buffer && push @dest, &add_pad($pad, &buffer_flush());
             my $bar = " " x ($width + $pad);
