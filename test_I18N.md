@@ -12,8 +12,8 @@
 | -------- | -------------------- |
 | English  | Hello                |
 | Flench   | Allô! Àla prochaine  |
-| German 　| Danke schön Präparat |
-| japanese | 日本語ですか？　     |
+| German   | Danke schön Präparat |
+| japanese | 日本語ですか？       |
 | hankaku  | ｵﾜｯﾀ                 |
 | Hindi    | नमस्कार                |
 | emoji    | 🦑  👨‍👩‍👧         |
